@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 
@@ -8,9 +9,21 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+var (
+	port int
+)
+
+func getFlags() {
+	flag.IntVar(&port, "p", 27017, "mongodb port")
+	flag.Parse()
+}
+
 func main() {
 
-	session, err := mgo.Dial("localhost")
+	getFlags()
+	fmt.Println(port)
+
+	session, err := mgo.Dial(fmt.Sprintf("localhost:%v", port))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -18,12 +31,12 @@ func main() {
 
 	coll := session.DB("test").C("people")
 
-	record := &struct {
-		Name  string
-		Grade string
-	}{"Bob", "T3"}
+	// record := &struct {
+	// 	Name  string
+	// 	Grade string
+	// }{"Bob", "T3"}
 
-	coll.Insert(record)
+	// coll.Insert(record)
 
 	var records []struct {
 		Name  string

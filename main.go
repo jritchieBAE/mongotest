@@ -1,17 +1,27 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
+	"time"
 
-	"github.com/globalsign/mgo"
-	"gopkg.in/mgo.v2/bson"
+	// "github.com/globalsign/mgo"
+	// "gopkg.in/mgo.v2/bson"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+type Person struct {
+	Name  string
+	Grade string
+}
 
 var (
 	port     int
@@ -32,59 +42,63 @@ func main() {
 
 	getFlags()
 
-	dialInfo := &mgo.DialInfo{
-		Addrs: []string{fmt.Sprintf("localhost:%v", port)},
-	}
+	url := fmt.Sprintf("mongodb://localhost:%v", port)
+	log.Println(url)
+	opt := options.Client().ApplyURI(url)
 	if len(rootPath) > 0 {
 		tlsConfig := getTLSConfig()
-		dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-			return tls.Dial("tcp", addr.String(), tlsConfig)
-		}
+		opt.TLSConfig = tlsConfig
 	}
-
-	log.Println("Making session")
-	session, err := mgo.DialWithInfo(dialInfo)
+	ctx, _ := context.WithTimeout(context.Background(), 8*time.Second)
+	client, err := mongo.Connect(ctx, opt)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer session.Close()
 
-	coll := session.DB("test").C("people")
+	// if err = client.Ping(ctx, nil); err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	// record := &struct {
+	coll := client.Database("test").Collection("people")
+
+	// record := &Person{Name: "Bob", Grade: "T3"}
+
+	// coll.InsertOne(ctx, record)
+
+	// var records []struct {
 	// 	Name  string
 	// 	Grade string
-	// }{"Bob", "T3"}
-
-	// coll.Insert(record)
-
-	var records []struct {
-		Name  string
-		Grade string
-	}
+	// }
 	log.Println("Querying...")
 
-	err = coll.Find(bson.M{"grade": "T3"}).All(&records)
+	cur, err := coll.Find(ctx, bson.M{"name": "Bob"})
 	if err != nil {
 		log.Fatal("record not found")
 	}
-	fmt.Println(records)
-
+	defer cur.Close(ctx)
+	for cur.Next(ctx) {
+		var result bson.M
+		err := cur.Decode(&result)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(result)
+	}
 }
 
 func getTLSConfig() *tls.Config {
-
+	defer log.Println("TLS Configured")
 	return &tls.Config{
 		RootCAs: func() *x509.CertPool {
 			if len(rootPath) > 0 {
 				log.Println("Loading root certificate")
 				ca, err := ioutil.ReadFile(rootPath)
 				if err != nil {
-					return nil
+					panic("Failed to load root certificate")
 				}
 				rootCAs := x509.NewCertPool()
 				if ok := rootCAs.AppendCertsFromPEM(ca); !ok {
-					panic("Failed to parse CA certificate")
+					panic("Failed to parse root certificate")
 				}
 				return rootCAs
 			}

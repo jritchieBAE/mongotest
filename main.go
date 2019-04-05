@@ -52,7 +52,7 @@ func main() {
 	}
 
 	userTags2 := bson.A{"HR", "IT", "MAN"}
-	query := bson.M{"contact info.email": "james@bae.com"}
+	query := bson.M{}
 
 	mongopl := mongo.Pipeline{
 		bson.D{

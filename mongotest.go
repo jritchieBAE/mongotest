@@ -10,7 +10,6 @@ import (
 	"net"
 
 	"github.com/globalsign/mgo"
-	"gopkg.in/mgo.v2/bson"
 )
 
 var (
@@ -66,9 +65,19 @@ func main() {
 
 	var records []Person
 
-	err = coll.Find(bson.M{}).All(&records)
+	query := &struct {
+		Tags string
+	}{
+		Tags: "HR",
+	}
+
+	err = coll.Find(query).All(&records)
 	if err != nil {
-		log.Fatal("record not found")
+		log.Fatal(err)
+	}
+	if len(records) == 0 {
+		fmt.Println("no records found")
+		return
 	}
 	for _, p := range records {
 		fmt.Printf("%+v\n", p)
